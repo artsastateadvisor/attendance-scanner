@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        body { font-family: sans-serif; text-align: center; margin: 0; padding: 20px; background: #f0f2f5; }
+        #reader { width: 100%; max-width: 400px; margin: auto; border-radius: 15px; overflow: hidden; }
+        select, button { width: 90%; max-width: 400px; padding: 15px; margin: 10px 0; border-radius: 8px; font-size: 16px; border: 1px solid #ddd; }
+        #status { color: #28a745; font-weight: bold; margin-top: 15px; }
+        .btn-start { background: #007bff; color: white; border: none; }
+    </style>
+</head>
+<body>
+    <h2>Breakout Scanner</h2>
+    <select id="session"><option value="">Select Session</option><option value="Room 1">Room 1</option><option value="Room 2">Room 2</option></select>
+    <button class="btn-start" id="startBtn" onclick="init()">Open Camera</button>
+    <div id="reader"></div>
+    <div id="status">Ready</div>
+
+    <script>
+        const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxw5D_6wdsbOpoKgyXyNoR9v5I-Fh2aDxQuQliweXWV6OyM8ShQ_vXe7EIPo39S69v3qw/exec';
+        let scanner = new Html5Qrcode("reader");
+
+        function init() {
+            if(!document.getElementById('session').value) return alert("Select Session!");
+            document.getElementById('startBtn').style.display = 'none';
+            scanner.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, onScan);
+        }
+
+        function onScan(text) {
+            scanner.pause();
+            document.getElementById('status').innerText = "Syncing...";
+            
+            fetch(GOOGLE_SCRIPT_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                body: JSON.stringify({ qrData: text, session: document.getElementById('session').value })
+            }).then(() => {
+                document.getElementById('status').innerText = "Success: " + text.split('|')[0];
+                setTimeout(() => { scanner.resume(); document.getElementById('status').innerText = "Ready"; }, 2000);
+            });
+        }
+    </script>
+</body>
+</html>
