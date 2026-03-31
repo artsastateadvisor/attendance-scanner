@@ -1,43 +1,164 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
+    <title>Breakout Scanner</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
-        body { font-family: sans-serif; text-align: center; margin: 0; padding: 20px; background: #f0f2f5; }
-        #reader { width: 100%; max-width: 400px; margin: auto; border-radius: 15px; overflow: hidden; }
-        select, button { width: 90%; max-width: 400px; padding: 15px; margin: 10px 0; border-radius: 8px; font-size: 16px; border: 1px solid #ddd; }
-        #status { color: #28a745; font-weight: bold; margin-top: 15px; }
-        .btn-start { background: #007bff; color: white; border: none; }
+        :root {
+            --primary: #1a73e8;
+            --success: #1e8e3e;
+            --bg: #f8f9fa;
+        }
+
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            margin: 0; 
+            padding: 20px; 
+            background-color: var(--bg);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h2 { color: #3c4043; margin-bottom: 20px; }
+
+        /* Container for the camera */
+        #reader { 
+            width: 100%; 
+            max-width: 400px; 
+            border-radius: 12px; 
+            overflow: hidden; 
+            background: black;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        /* Large, easy-to-tap inputs */
+        select, button { 
+            width: 100%; 
+            max-width: 400px; 
+            height: 55px; /* Large touch target */
+            margin: 10px 0; 
+            border-radius: 8px; 
+            font-size: 18px; 
+            border: 1px solid #dadce0;
+            -webkit-appearance: none; /* Removes default iOS styling */
+        }
+
+        select { background: white; padding: 0 15px; }
+
+        .btn-start { 
+            background: var(--primary); 
+            color: white; 
+            border: none; 
+            font-weight: 600;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .btn-start:active { background: #185abc; transform: translateY(1px); }
+
+        #status { 
+            margin-top: 20px; 
+            padding: 15px;
+            width: 90%;
+            border-radius: 8px;
+            font-weight: bold; 
+            font-size: 18px;
+            min-height: 24px;
+        }
+
+        .status-ready { color: #5f6368; }
+        .status-sync { color: var(--primary); background: #e8f0fe; }
+        .status-success { color: white; background: var(--success); }
+
+        /* Hidden class for cleaner UI transitions */
+        .hidden { display: none !important; }
     </style>
 </head>
 <body>
     <h2>Breakout Scanner</h2>
-    <select id="session"><option value="">Select Session</option><option value="Room 1">Room 1</option><option value="Room 2">Room 2</option></select>
-    <button class="btn-start" id="startBtn" onclick="init()">Open Camera</button>
-    <div id="reader"></div>
-    <div id="status">Ready</div>
+
+    <select id="session">
+        <option value="">-- Select Session --</option>
+        <option value="Session 1">Session 1</option>
+        <option value="Session 2">Session 2</option>
+        <option value="Session 3">Session 3</option>
+        <option value="Session 4">Session 4</option>
+        </select>
+
+    <button class="btn-start" id="startBtn" onclick="init()">Start Scanning</button>
+
+    <div id="reader" class="hidden"></div>
+    
+    <div id="status" class="status-ready">Select a session to begin</div>
 
     <script>
-        const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxw5D_6wdsbOpoKgyXyNoR9v5I-Fh2aDxQuQliweXWV6OyM8ShQ_vXe7EIPo39S69v3qw/exec';
+        // PASTE YOUR URL HERE
+        const GOOGLE_SCRIPT_URL = 'YOUR_DEPLOYED_WEB_APP_URL';
+        
         let scanner = new Html5Qrcode("reader");
 
         function init() {
-            if(!document.getElementById('session').value) return alert("Select Session!");
-            document.getElementById('startBtn').style.display = 'none';
-            scanner.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, onScan);
+            const session = document.getElementById('session').value;
+            if(!session) {
+                alert("Please select a session first!");
+                return;
+            }
+
+            // UI Changes
+            document.getElementById('startBtn').classList.add('hidden');
+            document.getElementById('reader').classList.remove('hidden');
+            document.getElementById('status').innerText = "Ready to scan...";
+
+            const config = { 
+                fps: 10, 
+                qrbox: { width: 250, height: 250 },
+                aspectRatio: 1.0 
+            };
+
+            scanner.start(
+                { facingMode: "environment" }, 
+                config, 
+                onScan
+            ).catch(err => {
+                alert("Camera Error: Please ensure you have allowed camera permissions.");
+                document.getElementById('startBtn').classList.remove('hidden');
+            });
         }
 
         function onScan(text) {
             scanner.pause();
-            document.getElementById('status').innerText = "Syncing...";
+            const statusDiv = document.getElementById('status');
             
+            statusDiv.className = "status-sync";
+            statusDiv.innerText = "Syncing Attendance...";
+            
+            const sessionName = document.getElementById('session').value;
+            const attendeeName = text.split('|')[0] || "Unknown";
+
             fetch(GOOGLE_SCRIPT_URL, {
                 method: 'POST',
                 mode: 'no-cors',
-                body: JSON.stringify({ qrData: text, session: document.getElementById('session').value })
+                body: JSON.stringify({ 
+                    qrData: text, 
+                    session: sessionName 
+                })
             }).then(() => {
-                document.getElementById('status').innerText = "Success: " + text.split('|')[0];
-                setTimeout(() => { scanner.resume(); document.getElementById('status').innerText = "Ready"; }, 2000);
+                statusDiv.className = "status-success";
+                statusDiv.innerText = "Logged: " + attendeeName;
+                
+                // Vibrate phone on success (if supported)
+                if (navigator.vibrate) navigator.vibrate(100);
+
+                setTimeout(() => { 
+                    scanner.resume(); 
+                    statusDiv.className = "status-ready";
+                    statusDiv.innerText = "Ready for next scan"; 
+                }, 1500);
+            }).catch(err => {
+                alert("Upload failed. Check internet connection.");
+                scanner.resume();
             });
         }
     </script>
